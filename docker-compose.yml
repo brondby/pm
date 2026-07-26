@@ -1,0 +1,12 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # No command override – the Dockerfile CMD runs the FastAPI server with Uvicorn.
+    env_file:
+      - .env
+    environment:
+      AI_MODEL: ${AI_MODEL:-openai/gpt-oss-120b}
+    ports:
+      - "8000:8000"
