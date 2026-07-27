@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -158,7 +158,7 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
     }
   }, [chatHistory, username]);
 
-  const persistLatestBoard = async () => {
+  const persistLatestBoard = useCallback(async () => {
     if (saveInFlightRef.current) {
       return;
     }
@@ -205,7 +205,7 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
         }
       }
     }
-  };
+  }, [username]);
 
   const applyBoardUpdate = (update: (previous: BoardData) => BoardData) => {
     setBoard((previous) => {
@@ -233,7 +233,7 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
     }
 
     void persistLatestBoard();
-  }, [board, isLoading, loadError, username]);
+  }, [board, isLoading, loadError, persistLatestBoard]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {

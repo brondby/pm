@@ -7,14 +7,14 @@ export default defineConfig({
     timeout: 10_000,
   },
   use: {
-    baseURL: "http://127.0.0.1:3000",
+    baseURL: "http://127.0.0.1:3100",
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "npm run dev -- --hostname 127.0.0.1 --port 3000",
-    url: "http://127.0.0.1:3000",
-    reuseExistingServer: true,
-    timeout: 120_000,
+    command: "npm run build && python3 -m http.server 3100 --directory out --bind 127.0.0.1",
+    url: "http://127.0.0.1:3100",
+    reuseExistingServer: false,
+    timeout: 180_000,
   },
   projects: [
     {

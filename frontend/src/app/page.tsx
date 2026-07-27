@@ -5,12 +5,19 @@ import { KanbanBoard } from "@/components/KanbanBoard";
 
 const VALID_USERNAME = "user";
 const VALID_PASSWORD = "password";
+const AUTH_STORAGE_KEY = "pm-auth-username";
 
 export default function Home() {
-  const [username, setUsername] = useState("");
+  const initialUsername =
+    typeof window === "undefined"
+      ? ""
+      : window.sessionStorage.getItem(AUTH_STORAGE_KEY) === VALID_USERNAME
+        ? VALID_USERNAME
+        : "";
+  const [username, setUsername] = useState(initialUsername);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(initialUsername === VALID_USERNAME);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -19,6 +26,11 @@ export default function Home() {
       setIsAuthenticated(true);
       setPassword("");
       setError(null);
+
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(AUTH_STORAGE_KEY, username);
+      }
+
       return;
     }
 
@@ -30,6 +42,10 @@ export default function Home() {
     setUsername("");
     setPassword("");
     setError(null);
+
+    if (typeof window !== "undefined") {
+      window.sessionStorage.removeItem(AUTH_STORAGE_KEY);
+    }
   };
 
   if (isAuthenticated) {

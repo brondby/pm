@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import Home from "@/app/page";
 
 vi.mock("@/components/KanbanBoard", () => ({
@@ -10,6 +10,10 @@ vi.mock("@/components/KanbanBoard", () => ({
 }));
 
 describe("Home auth flow", () => {
+    beforeEach(() => {
+        window.sessionStorage.clear();
+    });
+
     it("shows the login form on initial load", () => {
         render(<Home />);
 
