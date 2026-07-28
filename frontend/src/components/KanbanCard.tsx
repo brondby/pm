@@ -31,7 +31,7 @@ export const KanbanCard = ({ card, onDelete }: KanbanCardProps) => {
       data-testid={`card-${card.id}`}
     >
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <h4 className="font-display text-base font-semibold text-[var(--navy-dark)]">
             {card.title}
           </h4>
@@ -42,10 +42,27 @@ export const KanbanCard = ({ card, onDelete }: KanbanCardProps) => {
         <button
           type="button"
           onClick={() => onDelete(card.id)}
-          className="rounded-full border border-transparent px-2 py-1 text-xs font-semibold text-[var(--gray-text)] transition hover:border-[var(--stroke)] hover:text-[var(--navy-dark)]"
+          className="shrink-0 rounded-full p-1.5 text-[var(--gray-text)] transition hover:bg-[var(--surface)] hover:text-[var(--secondary-purple)]"
           aria-label={`Delete ${card.title}`}
+          title="Delete card"
         >
-          Remove
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.6}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4"
+            aria-hidden="true"
+          >
+            <path d="M4 5.5h12" />
+            <path d="M7.5 5.5V4a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1.5" />
+            <path d="M5.5 5.5 6 15.5a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l.5-10" />
+            <path d="M8.3 8.5v5" />
+            <path d="M11.7 8.5v5" />
+          </svg>
         </button>
       </div>
     </article>

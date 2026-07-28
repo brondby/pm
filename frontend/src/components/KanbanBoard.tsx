@@ -430,25 +430,29 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
           ) : null}
         </header>
 
-        <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           <DndContext
             sensors={sensors}
             collisionDetection={closestCorners}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
-            <section className="grid gap-6 lg:grid-cols-5">
-              {board.columns.map((column) => (
-                <KanbanColumn
-                  key={column.id}
-                  column={column}
-                  cards={column.cardIds.map((cardId) => board.cards[cardId])}
-                  onRename={handleRenameColumn}
-                  onAddCard={handleAddCard}
-                  onDeleteCard={handleDeleteCard}
-                />
-              ))}
-            </section>
+            <div className="relative min-w-0">
+              <section className="board-scroll flex gap-5 overflow-x-auto pb-3">
+                {board.columns.map((column) => (
+                  <div key={column.id} className="min-w-[240px] flex-1 basis-[260px]">
+                    <KanbanColumn
+                      column={column}
+                      cards={column.cardIds.map((cardId) => board.cards[cardId])}
+                      onRename={handleRenameColumn}
+                      onAddCard={handleAddCard}
+                      onDeleteCard={handleDeleteCard}
+                    />
+                  </div>
+                ))}
+              </section>
+              <div className="pointer-events-none absolute right-0 top-0 bottom-3 w-10 bg-gradient-to-l from-[var(--surface)] to-transparent" />
+            </div>
             <DragOverlay>
               {activeCard ? (
                 <div className="w-[260px]">
@@ -459,7 +463,7 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
           </DndContext>
 
           <aside
-            className="flex h-[720px] flex-col rounded-[28px] border border-[var(--stroke)] bg-white/90 p-5 shadow-[var(--shadow)]"
+            className="flex h-[720px] flex-col rounded-[28px] border border-[var(--stroke)] bg-white/90 p-5 shadow-[var(--shadow)] lg:sticky lg:top-6"
             data-testid="ai-sidebar"
           >
             <div className="mb-4">
