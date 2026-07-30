@@ -44,7 +44,7 @@ describe("KanbanBoard backend persistence", () => {
       })
     );
 
-    render(<KanbanBoard username="user" />);
+    render(<KanbanBoard boardId={1} />);
 
     expect(screen.getByText(/loading board/i)).toBeInTheDocument();
 
@@ -57,18 +57,18 @@ describe("KanbanBoard backend persistence", () => {
     mockedGetBoard.mockResolvedValue(sampleBoard());
     mockedPutBoard.mockResolvedValue(sampleBoard());
 
-    render(<KanbanBoard username="user" />);
+    render(<KanbanBoard boardId={1} />);
 
     await screen.findByText(/kanban studio/i);
 
-    expect(mockedGetBoard).toHaveBeenCalledWith("user", expect.any(Object));
+    expect(mockedGetBoard).toHaveBeenCalledWith(1, expect.any(Object));
     expect(mockedPutBoard).not.toHaveBeenCalled();
   });
 
   it("shows a user-friendly error when loading fails", async () => {
     mockedGetBoard.mockRejectedValue(new Error("Network down"));
 
-    render(<KanbanBoard username="user" />);
+    render(<KanbanBoard boardId={1} />);
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Network down");
@@ -78,9 +78,9 @@ describe("KanbanBoard backend persistence", () => {
   it("saves after a board change", async () => {
     const board = sampleBoard();
     mockedGetBoard.mockResolvedValue(board);
-    mockedPutBoard.mockImplementation(async (_username, payload) => payload);
+    mockedPutBoard.mockImplementation(async (_boardId, payload) => payload);
 
-    render(<KanbanBoard username="user" />);
+    render(<KanbanBoard boardId={1} />);
 
     const heading = await screen.findByText(/kanban studio/i);
     expect(heading).toBeInTheDocument();
@@ -93,14 +93,14 @@ describe("KanbanBoard backend persistence", () => {
     await userEvent.click(within(firstColumn).getByRole("button", { name: /add card/i }));
 
     await waitFor(() => expect(mockedPutBoard).toHaveBeenCalledTimes(1));
-    expect(mockedPutBoard.mock.calls[0]?.[0]).toBe("user");
+    expect(mockedPutBoard.mock.calls[0]?.[0]).toBe(1);
   });
 
   it("keeps current board state and shows error when save fails", async () => {
     mockedGetBoard.mockResolvedValue(sampleBoard());
     mockedPutBoard.mockRejectedValue(new Error("Save failed"));
 
-    render(<KanbanBoard username="user" />);
+    render(<KanbanBoard boardId={1} />);
 
     await screen.findByText(/kanban studio/i);
 
@@ -122,7 +122,7 @@ describe("KanbanBoard backend persistence", () => {
     let resolveFirstSave: () => void = () => { };
     const savedPayloads: BoardData[] = [];
 
-    mockedPutBoard.mockImplementation((_username, payload) => {
+    mockedPutBoard.mockImplementation((_boardId, payload) => {
       const snapshot = cloneBoard(payload);
       savedPayloads.push(snapshot);
 
@@ -135,7 +135,7 @@ describe("KanbanBoard backend persistence", () => {
       return Promise.resolve(snapshot);
     });
 
-    render(<KanbanBoard username="user" />);
+    render(<KanbanBoard boardId={1} />);
 
     await screen.findByText(/kanban studio/i);
 
@@ -172,7 +172,7 @@ describe("KanbanBoard backend persistence", () => {
       board: chatBoardState,
     });
 
-    render(<KanbanBoard username="user" />);
+    render(<KanbanBoard boardId={1} />);
 
     await screen.findByText(/kanban studio/i);
 
@@ -182,7 +182,7 @@ describe("KanbanBoard backend persistence", () => {
     await screen.findByText('Moved "Initial task" to "Done".');
 
     expect(mockedChatBoard).toHaveBeenCalledWith(
-      "user",
+      1,
       "move card Initial task to Done",
       expect.any(Object)
     );
@@ -194,7 +194,7 @@ describe("KanbanBoard backend persistence", () => {
 
   it("keeps board interactions usable while chat request is pending", async () => {
     mockedGetBoard.mockResolvedValue(sampleBoard());
-    mockedPutBoard.mockImplementation(async (_username, payload) => payload);
+    mockedPutBoard.mockImplementation(async (_boardId, payload) => payload);
 
     let resolveChat: () => void = () => { };
     mockedChatBoard.mockReturnValue(
@@ -207,7 +207,7 @@ describe("KanbanBoard backend persistence", () => {
       })
     );
 
-    render(<KanbanBoard username="user" />);
+    render(<KanbanBoard boardId={1} />);
 
     await screen.findByText(/kanban studio/i);
 
@@ -231,7 +231,7 @@ describe("KanbanBoard backend persistence", () => {
     mockedGetBoard.mockResolvedValue(sampleBoard());
     mockedChatBoard.mockRejectedValue(new Error("AI request timed out. Please try again."));
 
-    render(<KanbanBoard username="user" />);
+    render(<KanbanBoard boardId={1} />);
 
     await screen.findByText(/kanban studio/i);
 
@@ -249,7 +249,7 @@ describe("KanbanBoard backend persistence", () => {
     mockedGetBoard.mockResolvedValue(sampleBoard());
     mockedChatBoard.mockRejectedValue(new Error("Malformed chat response from server."));
 
-    render(<KanbanBoard username="user" />);
+    render(<KanbanBoard boardId={1} />);
 
     await screen.findByText(/kanban studio/i);
 
@@ -270,7 +270,7 @@ describe("KanbanBoard backend persistence", () => {
       board: sampleBoard(),
     });
 
-    const { unmount } = render(<KanbanBoard username="user" />);
+    const { unmount } = render(<KanbanBoard boardId={1} />);
     await screen.findByText(/kanban studio/i);
 
     await userEvent.type(screen.getByLabelText(/command/i), "delete card Initial task");
@@ -280,7 +280,7 @@ describe("KanbanBoard backend persistence", () => {
     unmount();
 
     mockedGetBoard.mockResolvedValue(sampleBoard());
-    render(<KanbanBoard username="user" />);
+    render(<KanbanBoard boardId={1} />);
 
     await screen.findByText(/kanban studio/i);
     expect(screen.getByText("delete card Initial task")).toBeInTheDocument();

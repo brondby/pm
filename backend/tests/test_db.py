@@ -1,4 +1,4 @@
-"""Tests for Part 5 SQLite modeling layer."""
+"""Tests for the SQLite data layer (Part 5 users/boards, Part 13 multi-board)."""
 
 from __future__ import annotations
 
@@ -16,11 +16,14 @@ if str(backend_dir) not in sys.path:
 from db import (  # noqa: E402
     create_board,
     create_user,
-    get_board_by_user_id,
+    delete_board,
+    get_board,
     get_connection,
     get_user_by_username,
     init_db,
-    update_board,
+    list_boards,
+    patch_board,
+    update_board_data,
     validate_board_data,
 )
 
@@ -66,6 +69,7 @@ def test_init_db_creates_database_file_and_tables(db_path: pathlib.Path):
         table_names = {row["name"] for row in table_rows}
         assert "users" in table_names
         assert "boards" in table_names
+        assert "sessions" in table_names
 
 
 def test_init_db_creates_missing_tables_in_existing_database_file(db_path: pathlib.Path):
@@ -94,14 +98,17 @@ def test_unique_username_constraint(db_path: pathlib.Path):
             create_user(connection, "user", "dummy_hash_v2")
 
 
-def test_one_board_per_user_constraint(db_path: pathlib.Path):
+def test_multiple_boards_per_user_are_allowed(db_path: pathlib.Path):
+    """As of Part 13, a user may own more than one board (no more UNIQUE(user_id))."""
     init_db(db_path)
     with get_connection(db_path) as connection:
         user_id = create_user(connection, "user", "dummy_hash_v1")
-        create_board(connection, user_id, sample_board())
+        create_board(connection, user_id, sample_board(), name="Board One")
+        create_board(connection, user_id, sample_board(), name="Board Two")
 
-        with pytest.raises(sqlite3.IntegrityError):
-            create_board(connection, user_id, sample_board())
+        boards = list_boards(connection, user_id)
+
+    assert {board["name"] for board in boards} == {"Board One", "Board Two"}
 
 
 def test_foreign_key_constraint_on_boards(db_path: pathlib.Path):
@@ -123,18 +130,96 @@ def test_validate_board_data_rejects_invalid_shape():
         validate_board_data(invalid_board)
 
 
-def test_update_board_rejects_invalid_payload(db_path: pathlib.Path):
+def test_update_board_data_rejects_invalid_payload(db_path: pathlib.Path):
     init_db(db_path)
 
     with get_connection(db_path) as connection:
         user_id = create_user(connection, "user", "dummy_hash_v1")
-        create_board(connection, user_id, sample_board())
+        board_id = create_board(connection, user_id, sample_board())
 
         invalid_board = sample_board()
         invalid_board["cards"]["card-1"]["details"] = None
 
         with pytest.raises(ValueError, match="cards\\[card-1\\]\\.details must be a string"):
-            update_board(connection, user_id, invalid_board)
+            update_board_data(connection, user_id, board_id, invalid_board)
+
+
+def test_list_boards_excludes_board_data(db_path: pathlib.Path):
+    init_db(db_path)
+    with get_connection(db_path) as connection:
+        user_id = create_user(connection, "user", "dummy_hash_v1")
+        create_board(connection, user_id, sample_board(), name="My Board")
+
+        boards = list_boards(connection, user_id)
+
+    assert len(boards) == 1
+    assert set(boards[0].keys()) == {"id", "name", "is_archived", "created_at", "updated_at"}
+
+
+def test_get_board_returns_none_for_wrong_owner(db_path: pathlib.Path):
+    init_db(db_path)
+    with get_connection(db_path) as connection:
+        owner_id = create_user(connection, "owner", "dummy_hash_v1")
+        other_id = create_user(connection, "other", "dummy_hash_v1")
+        board_id = create_board(connection, owner_id, sample_board())
+
+        assert get_board(connection, other_id, board_id) is None
+        assert get_board(connection, owner_id, board_id) is not None
+
+
+def test_get_board_returns_none_for_missing_board(db_path: pathlib.Path):
+    init_db(db_path)
+    with get_connection(db_path) as connection:
+        user_id = create_user(connection, "user", "dummy_hash_v1")
+        assert get_board(connection, user_id, 9999) is None
+
+
+def test_update_board_data_rejects_wrong_owner(db_path: pathlib.Path):
+    init_db(db_path)
+    with get_connection(db_path) as connection:
+        owner_id = create_user(connection, "owner", "dummy_hash_v1")
+        other_id = create_user(connection, "other", "dummy_hash_v1")
+        board_id = create_board(connection, owner_id, sample_board())
+
+        updated = update_board_data(connection, other_id, board_id, sample_board())
+        assert updated is False
+
+
+def test_patch_board_renames_and_archives(db_path: pathlib.Path):
+    init_db(db_path)
+    with get_connection(db_path) as connection:
+        user_id = create_user(connection, "user", "dummy_hash_v1")
+        board_id = create_board(connection, user_id, sample_board(), name="Original")
+
+        assert patch_board(connection, user_id, board_id, name="Renamed") is True
+        assert patch_board(connection, user_id, board_id, is_archived=True) is True
+
+        boards = list_boards(connection, user_id)
+
+    assert boards[0]["name"] == "Renamed"
+    assert boards[0]["is_archived"] is True
+
+
+def test_patch_board_rejects_wrong_owner(db_path: pathlib.Path):
+    init_db(db_path)
+    with get_connection(db_path) as connection:
+        owner_id = create_user(connection, "owner", "dummy_hash_v1")
+        other_id = create_user(connection, "other", "dummy_hash_v1")
+        board_id = create_board(connection, owner_id, sample_board())
+
+        assert patch_board(connection, other_id, board_id, name="Hijacked") is False
+
+
+def test_delete_board_removes_row_and_rejects_wrong_owner(db_path: pathlib.Path):
+    init_db(db_path)
+    with get_connection(db_path) as connection:
+        owner_id = create_user(connection, "owner", "dummy_hash_v1")
+        other_id = create_user(connection, "other", "dummy_hash_v1")
+        board_id = create_board(connection, owner_id, sample_board())
+
+        assert delete_board(connection, other_id, board_id) is False
+        assert delete_board(connection, owner_id, board_id) is True
+        assert get_board(connection, owner_id, board_id) is None
 
 
 def test_user_and_board_crud_round_trip_with_updated_timestamp(db_path: pathlib.Path):
@@ -149,8 +234,8 @@ def test_user_and_board_crud_round_trip_with_updated_timestamp(db_path: pathlib.
         assert user["username"] == "user"
         assert user["password_hash"] == "dummy_hash_v1"
 
-        create_board(connection, user_id, sample_board())
-        created_board = get_board_by_user_id(connection, user_id)
+        board_id = create_board(connection, user_id, sample_board())
+        created_board = get_board(connection, user_id, board_id)
 
         assert created_board is not None
         assert created_board["user_id"] == user_id
@@ -158,16 +243,16 @@ def test_user_and_board_crud_round_trip_with_updated_timestamp(db_path: pathlib.
 
         # Force a known old timestamp so we can assert update changed it deterministically.
         connection.execute(
-            "UPDATE boards SET updated_at = '2000-01-01T00:00:00.000Z' WHERE user_id = ?",
-            (user_id,),
+            "UPDATE boards SET updated_at = '2000-01-01T00:00:00.000Z' WHERE id = ?",
+            (board_id,),
         )
         connection.commit()
 
         updated_board_data = sample_board()
         updated_board_data["cards"]["card-1"]["title"] = "Updated title"
-        update_board(connection, user_id, updated_board_data)
+        update_board_data(connection, user_id, board_id, updated_board_data)
 
-        updated_board = get_board_by_user_id(connection, user_id)
+        updated_board = get_board(connection, user_id, board_id)
         assert updated_board is not None
         assert updated_board["board_data"]["cards"]["card-1"]["title"] == "Updated title"
         assert updated_board["updated_at"] != "2000-01-01T00:00:00.000Z"

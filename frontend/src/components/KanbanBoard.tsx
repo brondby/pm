@@ -17,7 +17,7 @@ import { chatBoard, getBoard, putBoard } from "@/lib/boardApi";
 import { createId, moveCard, type BoardData } from "@/lib/kanban";
 
 type KanbanBoardProps = {
-  username: string;
+  boardId: number;
 };
 
 type ChatMessage = {
@@ -31,9 +31,9 @@ const LOAD_ERROR_MESSAGE = "Could not load your board. Please try again.";
 const CHAT_ERROR_MESSAGE = "Could not send chat command. Please try again.";
 
 const serializeBoard = (board: BoardData) => JSON.stringify(board);
-const getChatHistoryStorageKey = (username: string) => `pm-chat-history:${username}`;
+const getChatHistoryStorageKey = (boardId: number) => `pm-chat-history:${boardId}`;
 
-export const KanbanBoard = ({ username }: KanbanBoardProps) => {
+export const KanbanBoard = ({ boardId }: KanbanBoardProps) => {
   const [board, setBoard] = useState<BoardData | null>(null);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -84,7 +84,7 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
       }
 
       try {
-        const raw = window.sessionStorage.getItem(getChatHistoryStorageKey(username));
+        const raw = window.sessionStorage.getItem(getChatHistoryStorageKey(boardId));
         if (!raw) {
           return [];
         }
@@ -114,7 +114,7 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
 
     const load = async () => {
       try {
-        const loadedBoard = await getBoard(username, { signal: loadController.signal });
+        const loadedBoard = await getBoard(boardId, { signal: loadController.signal });
         if (!isMountedRef.current || loadController.signal.aborted) {
           return;
         }
@@ -141,7 +141,7 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
     };
 
     void load();
-  }, [username]);
+  }, [boardId]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -150,13 +150,13 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
 
     try {
       window.sessionStorage.setItem(
-        getChatHistoryStorageKey(username),
+        getChatHistoryStorageKey(boardId),
         JSON.stringify(chatHistory)
       );
     } catch {
       // Ignore storage write failures in restricted environments.
     }
-  }, [chatHistory, username]);
+  }, [chatHistory, boardId]);
 
   const persistLatestBoard = useCallback(async () => {
     if (saveInFlightRef.current) {
@@ -181,7 +181,7 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
       saveAbortRef.current = saveController;
 
       try {
-        await putBoard(username, latestBoard, { signal: saveController.signal });
+        await putBoard(boardId, latestBoard, { signal: saveController.signal });
 
         if (!isMountedRef.current || saveController.signal.aborted) {
           return;
@@ -205,7 +205,7 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
         }
       }
     }
-  }, [username]);
+  }, [boardId]);
 
   const applyBoardUpdate = (update: (previous: BoardData) => BoardData) => {
     setBoard((previous) => {
@@ -317,7 +317,7 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
     chatAbortRef.current = chatController;
 
     try {
-      const response = await chatBoard(username, message, { signal: chatController.signal });
+      const response = await chatBoard(boardId, message, { signal: chatController.signal });
 
       if (!isMountedRef.current || chatController.signal.aborted) {
         return;
@@ -385,7 +385,7 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[var(--gray-text)]">
-                Single Board Kanban
+                Kanban Board
               </p>
               <h1 className="mt-3 font-display text-4xl font-semibold text-[var(--navy-dark)]">
                 Kanban Studio
@@ -400,7 +400,7 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
                 Focus
               </p>
               <p className="mt-2 text-lg font-semibold text-[var(--primary-blue)]">
-                One board. Five columns. Zero clutter.
+                Rename columns. Drag cards. Zero clutter.
               </p>
             </div>
           </div>

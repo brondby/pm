@@ -23,10 +23,10 @@ const getErrorDetail = async (response: Response) => {
 };
 
 export const getBoard = async (
-    username: string,
+    boardId: number,
     options?: { signal?: AbortSignal }
 ): Promise<BoardData> => {
-    const response = await fetch(`/api/board/${encodeURIComponent(username)}`, {
+    const response = await fetch(`/api/boards/${boardId}`, {
         method: "GET",
         headers: {
             Accept: "application/json",
@@ -42,11 +42,11 @@ export const getBoard = async (
 };
 
 export const putBoard = async (
-    username: string,
+    boardId: number,
     board: BoardData,
     options?: { signal?: AbortSignal }
 ): Promise<BoardData> => {
-    const response = await fetch(`/api/board/${encodeURIComponent(username)}`, {
+    const response = await fetch(`/api/boards/${boardId}`, {
         method: "PUT",
         headers: {
             "Content-Type": "application/json",
@@ -69,11 +69,11 @@ export type ChatBoardResponse = {
 };
 
 export const chatBoard = async (
-    username: string,
+    boardId: number,
     message: string,
     options?: { signal?: AbortSignal }
 ): Promise<ChatBoardResponse> => {
-    const response = await fetch(`/api/board/${encodeURIComponent(username)}/chat`, {
+    const response = await fetch(`/api/boards/${boardId}/chat`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",

@@ -1,11 +1,9 @@
-"""Minimal SQLite data layer for Part 5 (database modeling).
-
-This module intentionally keeps scope small:
+"""SQLite data layer: users, sessions, and multi-board CRUD.
 
 * create/open SQLite database
-* initialize schema for users + boards
+* initialize schema for users, sessions, and boards (multiple per user, Part 13)
 * validate board JSON contract
-* provide basic user/board CRUD helpers for tests and future API wiring
+* board CRUD helpers enforce per-user ownership directly in their SQL ``WHERE`` clauses
 """
 
 from __future__ import annotations
@@ -28,10 +26,21 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS boards (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL UNIQUE,
+    user_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
     board_data TEXT NOT NULL,
+    is_archived INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now')),
     updated_at TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token TEXT NOT NULL UNIQUE,
+    user_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    expires_at TEXT NOT NULL,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 """
@@ -184,21 +193,58 @@ def get_user_by_username(connection: sqlite3.Connection, username: str) -> dict[
     }
 
 
-def create_board(connection: sqlite3.Connection, user_id: int, board_data: dict[str, Any]) -> int:
+def create_board(
+    connection: sqlite3.Connection, user_id: int, board_data: dict[str, Any], name: str = "My Board"
+) -> int:
+    _require_non_empty_string(name, "name")
     payload = _serialize_board_data(board_data)
 
     cursor = connection.execute(
-        "INSERT INTO boards (user_id, board_data) VALUES (?, ?)",
-        (user_id, payload),
+        "INSERT INTO boards (user_id, name, board_data) VALUES (?, ?, ?)",
+        (user_id, name, payload),
     )
     connection.commit()
     return int(cursor.lastrowid)
 
 
-def get_board_by_user_id(connection: sqlite3.Connection, user_id: int) -> dict[str, Any] | None:
-    row = connection.execute(
-        "SELECT id, user_id, board_data, created_at, updated_at FROM boards WHERE user_id = ?",
+def _board_summary_from_row(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": int(row["id"]),
+        "name": str(row["name"]),
+        "is_archived": bool(row["is_archived"]),
+        "created_at": str(row["created_at"]),
+        "updated_at": str(row["updated_at"]),
+    }
+
+
+def list_boards(connection: sqlite3.Connection, user_id: int) -> list[dict[str, Any]]:
+    """Return lightweight metadata (no ``board_data``) for every board owned by ``user_id``."""
+    rows = connection.execute(
+        """
+        SELECT id, name, is_archived, created_at, updated_at
+        FROM boards
+        WHERE user_id = ?
+        ORDER BY updated_at DESC
+        """,
         (user_id,),
+    ).fetchall()
+    return [_board_summary_from_row(row) for row in rows]
+
+
+def get_board(connection: sqlite3.Connection, user_id: int, board_id: int) -> dict[str, Any] | None:
+    """Fetch one full board (including ``board_data``), scoped to its owner.
+
+    Returns ``None`` if the board doesn't exist *or* belongs to a different
+    user - callers must treat both cases identically (404), never leaking
+    which one it was.
+    """
+    row = connection.execute(
+        """
+        SELECT id, user_id, name, board_data, is_archived, created_at, updated_at
+        FROM boards
+        WHERE id = ? AND user_id = ?
+        """,
+        (board_id, user_id),
     ).fetchone()
 
     if row is None:
@@ -207,13 +253,18 @@ def get_board_by_user_id(connection: sqlite3.Connection, user_id: int) -> dict[s
     return {
         "id": int(row["id"]),
         "user_id": int(row["user_id"]),
+        "name": str(row["name"]),
         "board_data": json.loads(str(row["board_data"])),
+        "is_archived": bool(row["is_archived"]),
         "created_at": str(row["created_at"]),
         "updated_at": str(row["updated_at"]),
     }
 
 
-def update_board(connection: sqlite3.Connection, user_id: int, board_data: dict[str, Any]) -> None:
+def update_board_data(
+    connection: sqlite3.Connection, user_id: int, board_id: int, board_data: dict[str, Any]
+) -> bool:
+    """Replace a board's data. Returns ``False`` if the board doesn't exist or isn't owned by ``user_id``."""
     payload = _serialize_board_data(board_data)
 
     cursor = connection.execute(
@@ -221,12 +272,95 @@ def update_board(connection: sqlite3.Connection, user_id: int, board_data: dict[
         UPDATE boards
         SET board_data = ?,
             updated_at = STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now')
-        WHERE user_id = ?
+        WHERE id = ? AND user_id = ?
         """,
-        (payload, user_id),
+        (payload, board_id, user_id),
     )
+    connection.commit()
+    return cursor.rowcount > 0
 
-    if cursor.rowcount == 0:
-        raise ValueError("Board not found for user.")
 
+def patch_board(
+    connection: sqlite3.Connection,
+    user_id: int,
+    board_id: int,
+    name: str | None = None,
+    is_archived: bool | None = None,
+) -> bool:
+    """Rename and/or archive/unarchive a board. Returns ``False`` if not found/owned."""
+    assignments = ["updated_at = STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now')"]
+    params: list[Any] = []
+
+    if name is not None:
+        assignments.append("name = ?")
+        params.append(name)
+    if is_archived is not None:
+        assignments.append("is_archived = ?")
+        params.append(1 if is_archived else 0)
+
+    params.extend([board_id, user_id])
+
+    cursor = connection.execute(
+        f"UPDATE boards SET {', '.join(assignments)} WHERE id = ? AND user_id = ?",
+        params,
+    )
+    connection.commit()
+    return cursor.rowcount > 0
+
+
+def delete_board(connection: sqlite3.Connection, user_id: int, board_id: int) -> bool:
+    """Permanently delete a board. Returns ``False`` if not found/owned."""
+    cursor = connection.execute(
+        "DELETE FROM boards WHERE id = ? AND user_id = ?",
+        (board_id, user_id),
+    )
+    connection.commit()
+    return cursor.rowcount > 0
+
+
+def insert_session(
+    connection: sqlite3.Connection, token: str, user_id: int, expires_at: str
+) -> None:
+    _require_non_empty_string(token, "token")
+    _require_non_empty_string(expires_at, "expires_at")
+
+    connection.execute(
+        "INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)",
+        (token, user_id, expires_at),
+    )
+    connection.commit()
+
+
+def get_session_with_user(connection: sqlite3.Connection, token: str) -> dict[str, Any] | None:
+    """Look up a session by token, joined with its owning user.
+
+    Returns ``None`` if the token doesn't exist. Callers are responsible for
+    checking ``expires_at`` against the current time.
+    """
+    row = connection.execute(
+        """
+        SELECT sessions.token AS token,
+               sessions.user_id AS user_id,
+               sessions.expires_at AS expires_at,
+               users.username AS username
+        FROM sessions
+        JOIN users ON users.id = sessions.user_id
+        WHERE sessions.token = ?
+        """,
+        (token,),
+    ).fetchone()
+
+    if row is None:
+        return None
+
+    return {
+        "token": str(row["token"]),
+        "user_id": int(row["user_id"]),
+        "expires_at": str(row["expires_at"]),
+        "username": str(row["username"]),
+    }
+
+
+def delete_session(connection: sqlite3.Connection, token: str) -> None:
+    connection.execute("DELETE FROM sessions WHERE token = ?", (token,))
     connection.commit()

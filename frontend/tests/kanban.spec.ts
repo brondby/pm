@@ -2,6 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 
 import type { BoardData } from "@/lib/kanban";
 
+const DEFAULT_BOARD_ID = 1;
+
 const createBoard = (): BoardData => ({
   columns: [
     { id: "col-backlog", title: "Backlog", cardIds: ["card-1"] },
@@ -19,7 +21,63 @@ const createBoard = (): BoardData => ({
   },
 });
 
+const mockAuth = async (page: Page) => {
+  // Mirrors real cookie-based session behavior: once "logged in", /api/auth/me
+  // keeps reporting the session as active (e.g. across a page reload) until
+  // /api/auth/logout is called.
+  let isAuthenticated = false;
+
+  await page.route("**/api/auth/me", async (route) => {
+    await route.fulfill(
+      isAuthenticated
+        ? { status: 200, contentType: "application/json", body: JSON.stringify({ username: "user" }) }
+        : { status: 401, contentType: "application/json", body: JSON.stringify({ detail: "Not authenticated." }) }
+    );
+  });
+  await page.route("**/api/auth/login", async (route) => {
+    isAuthenticated = true;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ username: "user" }),
+    });
+  });
+  await page.route("**/api/auth/logout", async (route) => {
+    isAuthenticated = false;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true }),
+    });
+  });
+};
+
+const mockSingleDefaultBoard = async (page: Page) => {
+  await page.route("**/api/boards", async (route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: DEFAULT_BOARD_ID,
+            name: "My Board",
+            is_archived: false,
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-01-01T00:00:00.000Z",
+          },
+        ]),
+      });
+      return;
+    }
+
+    await route.fallback();
+  });
+};
+
 const login = async (page: Page) => {
+  await mockAuth(page);
+  await mockSingleDefaultBoard(page);
   await page.goto("/");
   await page.getByLabel("Username").fill("user");
   await page.getByLabel("Password").fill("password");
@@ -29,7 +87,7 @@ const login = async (page: Page) => {
 test("login loads board from API", async ({ page }) => {
   const board = createBoard();
 
-  await page.route("**/api/board/user", async (route) => {
+  await page.route(`**/api/boards/${DEFAULT_BOARD_ID}`, async (route) => {
     if (route.request().method() === "GET") {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(board) });
       return;
@@ -48,7 +106,7 @@ test("edit triggers save and refresh restores persisted board", async ({ page })
   let board = createBoard();
   const putPayloads: BoardData[] = [];
 
-  await page.route("**/api/board/user", async (route) => {
+  await page.route(`**/api/boards/${DEFAULT_BOARD_ID}`, async (route) => {
     const method = route.request().method();
 
     if (method === "GET") {
