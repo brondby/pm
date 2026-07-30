@@ -16,7 +16,9 @@ than the original hardcoded MVP credential - see `docs/PLAN.md`.
 
 As of Part 13, users may have multiple Kanban boards (create/rename/archive/delete/switch), not just one.
 
-For the MVP, this will run locally (in a docker container)
+As of Part 14, cards may optionally carry a label, due date, and assignee, in addition to title/details.
+
+This still runs locally only (in a Docker container) - no hosted/multi-tenant deployment story exists yet.
 
 ## Technical Decisions
 
@@ -29,9 +31,11 @@ For the MVP, this will run locally (in a docker container)
 - Use SQLLite local database for the database, creating a new db if it doesn't exist
 - Start and Stop server scripts for Mac, PC, Linux in scripts/
 
-## Starting Point
+## Starting Point (historical)
 
-A working MVP of the frontend has been built and is already in frontend. This is not yet designed for the Docker setup. It's a pure frontend-only demo.
+The project began from a pure frontend-only Kanban demo in `frontend/`, with no Docker/backend wiring yet.
+Docker packaging, the FastAPI backend, and real persistence were added starting in Part 2 of `docs/PLAN.md` -
+this section is kept only as a record of the initial hand-off state, not the current architecture.
 
 ## Color Scheme
 

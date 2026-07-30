@@ -10,11 +10,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
 
 DEFAULT_DB_PATH = Path(__file__).resolve().parent / "data" / "pm.db"
+
+_ISO_DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS users (
@@ -90,14 +93,38 @@ def _require_non_empty_string(value: Any, field_name: str) -> str:
     return value
 
 
+def _validate_optional_string_field(card: dict[str, Any], card_id: str, field_name: str) -> None:
+    if field_name not in card or card[field_name] is None:
+        return
+    if not isinstance(card[field_name], str):
+        raise ValueError(f"cards[{card_id}].{field_name} must be a string or null.")
+
+
+def _validate_optional_due_date_field(card: dict[str, Any], card_id: str) -> None:
+    value = card.get("dueDate")
+    if value is None:
+        return
+    if not isinstance(value, str) or not _ISO_DATE_PATTERN.match(value):
+        raise ValueError(f"cards[{card_id}].dueDate must be an ISO date string (YYYY-MM-DD) or null.")
+
+
 def validate_board_data(board_data: Any) -> None:
     """Validate board JSON contract aligned with frontend ``BoardData``.
 
     Required shape:
     {
       "columns": [{"id": str, "title": str, "cardIds": string[]}],
-      "cards": {"card-id": {"id": str, "title": str, "details": str}}
+      "cards": {
+        "card-id": {
+          "id": str, "title": str, "details": str,
+          "label": str | null (optional), "dueDate": "YYYY-MM-DD" | null (optional),
+          "assignee": str | null (optional)
+        }
+      }
     }
+
+    ``label``/``dueDate``/``assignee`` are optional card metadata (Part 14): a card
+    predating them simply omits the keys, which is valid.
     """
     if not isinstance(board_data, dict):
         raise ValueError("board_data must be an object.")
@@ -146,6 +173,10 @@ def validate_board_data(board_data: Any) -> None:
         _require_non_empty_string(card.get("title"), f"cards[{card_id}].title")
         if not isinstance(card.get("details"), str):
             raise ValueError(f"cards[{card_id}].details must be a string.")
+
+        _validate_optional_string_field(card, card_id, "label")
+        _validate_optional_string_field(card, card_id, "assignee")
+        _validate_optional_due_date_field(card, card_id)
 
     unique_references = set(all_card_references)
     if len(unique_references) != len(all_card_references):

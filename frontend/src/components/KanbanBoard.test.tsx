@@ -286,4 +286,108 @@ describe("KanbanBoard backend persistence", () => {
     expect(screen.getByText("delete card Initial task")).toBeInTheDocument();
     expect(screen.getByText("Assistant reply")).toBeInTheDocument();
   });
+
+  it("creates a card as quickly as before when the optional metadata fields are left collapsed", async () => {
+    const board = sampleBoard();
+    mockedGetBoard.mockResolvedValue(board);
+    mockedPutBoard.mockImplementation(async (_boardId, payload) => payload);
+
+    render(<KanbanBoard boardId={1} />);
+    await screen.findByText(/kanban studio/i);
+
+    const firstColumn = screen.getByTestId("column-col-backlog");
+    await userEvent.click(within(firstColumn).getByRole("button", { name: /add a card/i }));
+    await userEvent.type(within(firstColumn).getByPlaceholderText(/card title/i), "Quick card");
+    await userEvent.click(within(firstColumn).getByRole("button", { name: /add card/i }));
+
+    await waitFor(() => expect(mockedPutBoard).toHaveBeenCalledTimes(1));
+    const savedCards = Object.values(mockedPutBoard.mock.calls[0][1].cards);
+    const newCard = savedCards.find((card) => card.title === "Quick card");
+    expect(newCard?.label).toBeUndefined();
+    expect(newCard?.dueDate).toBeUndefined();
+    expect(newCard?.assignee).toBeUndefined();
+  });
+
+  it("creates a card with optional label, due date, and assignee", async () => {
+    const board = sampleBoard();
+    mockedGetBoard.mockResolvedValue(board);
+    mockedPutBoard.mockImplementation(async (_boardId, payload) => payload);
+
+    render(<KanbanBoard boardId={1} />);
+    await screen.findByText(/kanban studio/i);
+
+    const firstColumn = screen.getByTestId("column-col-backlog");
+    await userEvent.click(within(firstColumn).getByRole("button", { name: /add a card/i }));
+    await userEvent.type(within(firstColumn).getByPlaceholderText(/card title/i), "Detailed card");
+    await userEvent.click(
+      within(firstColumn).getByRole("button", { name: /add label, due date, or assignee/i })
+    );
+    await userEvent.type(within(firstColumn).getByLabelText(/card label/i), "Urgent");
+    await userEvent.type(within(firstColumn).getByLabelText(/due date/i), "2026-08-15");
+    await userEvent.type(within(firstColumn).getByLabelText(/assignee/i), "Alex");
+    await userEvent.click(within(firstColumn).getByRole("button", { name: /add card/i }));
+
+    expect(await within(firstColumn).findByText("Urgent")).toBeInTheDocument();
+    expect(within(firstColumn).getByText(/due 2026-08-15/i)).toBeInTheDocument();
+    expect(within(firstColumn).getByText("Alex")).toBeInTheDocument();
+
+    await waitFor(() => expect(mockedPutBoard).toHaveBeenCalledTimes(1));
+    const savedCards = Object.values(mockedPutBoard.mock.calls[0][1].cards);
+    const newCard = savedCards.find((card) => card.title === "Detailed card");
+    expect(newCard?.label).toBe("Urgent");
+    expect(newCard?.dueDate).toBe("2026-08-15");
+    expect(newCard?.assignee).toBe("Alex");
+  });
+
+  it("edits an existing card's metadata while preserving its title and details", async () => {
+    const board = sampleBoard();
+    mockedGetBoard.mockResolvedValue(board);
+    mockedPutBoard.mockImplementation(async (_boardId, payload) => payload);
+
+    render(<KanbanBoard boardId={1} />);
+    await screen.findByText(/kanban studio/i);
+
+    const card = screen.getByTestId("card-card-1");
+    await userEvent.click(within(card).getByRole("button", { name: /edit details/i }));
+    await userEvent.type(within(card).getByLabelText(/card label/i), "Blocked");
+    await userEvent.type(within(card).getByLabelText(/assignee/i), "Sam");
+    await userEvent.click(within(card).getByRole("button", { name: /^save$/i }));
+
+    expect(within(card).getByText("Blocked")).toBeInTheDocument();
+    expect(within(card).getByText("Sam")).toBeInTheDocument();
+    expect(within(card).getByText("Initial task")).toBeInTheDocument();
+    expect(within(card).getByText("Seed details")).toBeInTheDocument();
+
+    await waitFor(() => expect(mockedPutBoard).toHaveBeenCalledTimes(1));
+    const savedCard = mockedPutBoard.mock.calls[0][1].cards["card-1"];
+    expect(savedCard.title).toBe("Initial task");
+    expect(savedCard.details).toBe("Seed details");
+    expect(savedCard.label).toBe("Blocked");
+    expect(savedCard.assignee).toBe("Sam");
+  });
+
+  it("clears a metadata field by saving the edit form with it emptied", async () => {
+    const board = sampleBoard();
+    board.cards["card-1"].label = "Urgent";
+    board.cards["card-1"].dueDate = "2026-08-15";
+    mockedGetBoard.mockResolvedValue(board);
+    mockedPutBoard.mockImplementation(async (_boardId, payload) => payload);
+
+    render(<KanbanBoard boardId={1} />);
+    await screen.findByText(/kanban studio/i);
+
+    const card = screen.getByTestId("card-card-1");
+    expect(within(card).getByText("Urgent")).toBeInTheDocument();
+
+    await userEvent.click(within(card).getByRole("button", { name: /edit details/i }));
+    await userEvent.clear(within(card).getByLabelText(/card label/i));
+    await userEvent.click(within(card).getByRole("button", { name: /^save$/i }));
+
+    expect(within(card).queryByText("Urgent")).not.toBeInTheDocument();
+
+    await waitFor(() => expect(mockedPutBoard).toHaveBeenCalledTimes(1));
+    const savedCard = mockedPutBoard.mock.calls[0][1].cards["card-1"];
+    expect(savedCard.label).toBeUndefined();
+    expect(savedCard.dueDate).toBe("2026-08-15");
+  });
 });

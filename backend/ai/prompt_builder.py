@@ -15,10 +15,15 @@ def build_system_prompt() -> str:
         "Allowed operation types:\n"
         "- move_card\n"
         "- rename_column\n"
-        "- create_card\n"
+        "- create_card (optionally set label, due_date, assignee)\n"
+        "- update_card (change a card's title, details, label, due_date, or assignee)\n"
         "- delete_card\n"
+        "For update_card, only include the fields you want to change - fields you omit keep their "
+        "current value. To remove a label, due_date, or assignee, set it to null explicitly.\n"
+        "due_date must be an ISO date string in YYYY-MM-DD format.\n"
         "Response JSON contract:\n"
-        '{"reply":"string","operations":[{"type":"move_card|rename_column|create_card|delete_card"}]}'
+        '{"reply":"string","operations":['
+        '{"type":"move_card|rename_column|create_card|delete_card|update_card"}]}'
     )
 
 
@@ -31,6 +36,7 @@ def build_user_prompt(board_data: dict[str, Any], message: str) -> str:
                 "move_card",
                 "rename_column",
                 "create_card",
+                "update_card",
                 "delete_card",
             ],
             "never_return_board": True,
@@ -39,14 +45,29 @@ def build_user_prompt(board_data: dict[str, Any], message: str) -> str:
         "operation_field_hints": {
             "move_card": ["card_id|card_title", "to_column_id|to_column_title"],
             "rename_column": ["column_id|column_title", "new_title"],
-            "create_card": ["column_id|column_title", "title", "details(optional)"],
+            "create_card": [
+                "column_id|column_title",
+                "title",
+                "details(optional)",
+                "label(optional)",
+                "due_date(optional, YYYY-MM-DD)",
+                "assignee(optional)",
+            ],
+            "update_card": [
+                "card_id|card_title",
+                "title(optional)",
+                "details(optional)",
+                "label(optional, null clears it)",
+                "due_date(optional, YYYY-MM-DD, null clears it)",
+                "assignee(optional, null clears it)",
+            ],
             "delete_card": ["card_id|card_title"],
         },
         "response_contract": {
             "reply": "string",
             "operations": [
                 {
-                    "type": "move_card|rename_column|create_card|delete_card",
+                    "type": "move_card|rename_column|create_card|update_card|delete_card",
                 }
             ],
         },

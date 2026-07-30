@@ -14,7 +14,7 @@ import {
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { chatBoard, getBoard, putBoard } from "@/lib/boardApi";
-import { createId, moveCard, type BoardData } from "@/lib/kanban";
+import { applyCardMetadata, createId, moveCard, type BoardData, type CardMetadata } from "@/lib/kanban";
 
 type KanbanBoardProps = {
   boardId: number;
@@ -270,18 +270,44 @@ export const KanbanBoard = ({ boardId }: KanbanBoardProps) => {
     }));
   };
 
-  const handleAddCard = (columnId: string, title: string, details: string) => {
+  const handleAddCard = (
+    columnId: string,
+    title: string,
+    details: string,
+    metadata: CardMetadata
+  ) => {
     const id = createId("card");
+    const card = applyCardMetadata(
+      { id, title, details: details || "No details yet." },
+      metadata
+    );
     applyBoardUpdate((previous) => ({
       ...previous,
       cards: {
         ...previous.cards,
-        [id]: { id, title, details: details || "No details yet." },
+        [id]: card,
       },
       columns: previous.columns.map((column) =>
         column.id === columnId ? { ...column, cardIds: [...column.cardIds, id] } : column
       ),
     }));
+  };
+
+  const handleEditCardMetadata = (cardId: string, metadata: CardMetadata) => {
+    applyBoardUpdate((previous) => {
+      const existingCard = previous.cards[cardId];
+      if (!existingCard) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        cards: {
+          ...previous.cards,
+          [cardId]: applyCardMetadata(existingCard, metadata),
+        },
+      };
+    });
   };
 
   const handleDeleteCard = (columnId: string, cardId: string) => {
@@ -447,6 +473,7 @@ export const KanbanBoard = ({ boardId }: KanbanBoardProps) => {
                       onRename={handleRenameColumn}
                       onAddCard={handleAddCard}
                       onDeleteCard={handleDeleteCard}
+                      onEditCardMetadata={handleEditCardMetadata}
                     />
                   </div>
                 ))}

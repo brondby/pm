@@ -27,6 +27,7 @@ def test_build_system_prompt_includes_strict_json_contract():
     assert "move_card" in prompt
     assert "rename_column" in prompt
     assert "create_card" in prompt
+    assert "update_card" in prompt
     assert "delete_card" in prompt
 
 
@@ -45,5 +46,6 @@ def test_build_user_prompt_embeds_message_and_board():
         "move_card",
         "rename_column",
         "create_card",
+        "update_card",
         "delete_card",
     ]

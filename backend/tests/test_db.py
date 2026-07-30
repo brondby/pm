@@ -130,6 +130,54 @@ def test_validate_board_data_rejects_invalid_shape():
         validate_board_data(invalid_board)
 
 
+def test_validate_board_data_accepts_cards_without_metadata_fields():
+    """Older boards/cards that predate Part 14 metadata must keep loading fine."""
+    validate_board_data(sample_board())
+
+
+def test_validate_board_data_accepts_optional_metadata_fields():
+    board = sample_board()
+    board["cards"]["card-1"]["label"] = "Urgent"
+    board["cards"]["card-1"]["dueDate"] = "2026-08-15"
+    board["cards"]["card-1"]["assignee"] = "Alex"
+
+    validate_board_data(board)
+
+
+def test_validate_board_data_accepts_null_metadata_fields():
+    board = sample_board()
+    board["cards"]["card-1"]["label"] = None
+    board["cards"]["card-1"]["dueDate"] = None
+    board["cards"]["card-1"]["assignee"] = None
+
+    validate_board_data(board)
+
+
+def test_validate_board_data_rejects_non_string_label():
+    board = sample_board()
+    board["cards"]["card-1"]["label"] = 42
+
+    with pytest.raises(ValueError, match="label"):
+        validate_board_data(board)
+
+
+def test_validate_board_data_rejects_non_string_assignee():
+    board = sample_board()
+    board["cards"]["card-1"]["assignee"] = ["Alex"]
+
+    with pytest.raises(ValueError, match="assignee"):
+        validate_board_data(board)
+
+
+@pytest.mark.parametrize("bad_due_date", ["08/15/2026", "2026-8-15", "not-a-date", ""])
+def test_validate_board_data_rejects_malformed_due_date(bad_due_date):
+    board = sample_board()
+    board["cards"]["card-1"]["dueDate"] = bad_due_date
+
+    with pytest.raises(ValueError, match="dueDate"):
+        validate_board_data(board)
+
+
 def test_update_board_data_rejects_invalid_payload(db_path: pathlib.Path):
     init_db(db_path)
 

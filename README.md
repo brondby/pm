@@ -1,16 +1,20 @@
-# Project Management MVP (v1.0 Release Candidate)
+# Project Management App
 
 ## Project overview
 
-This repository contains a local-first Project Management MVP with:
+This repository contains a local-first Project Management app with:
 
 - FastAPI backend
 - Next.js frontend
 - SQLite persistence
-- Kanban board editing (rename, add, delete, drag-and-drop)
-- AI sidebar integrated with OpenRouter for structured board operations
+- Real per-user accounts (signup/login/logout, server-side sessions)
+- Multiple Kanban boards per user, with create/rename/archive/delete/switch
+- Kanban board editing (rename columns, add/edit/delete cards, drag-and-drop, optional label/due date/assignee
+  per card)
+- AI sidebar integrated with OpenRouter for structured board operations (move/create/update/delete cards,
+  rename columns)
 
-The app supports a simple MVP sign-in flow (`user` / `password`) and stores one board per user.
+Sign-in is a real account (not a shared demo credential), and each user's boards are private to them.
 
 ## Architecture
 
@@ -18,15 +22,18 @@ The app supports a simple MVP sign-in flow (`user` / `password`) and stores one 
 +---------------------------+
 |        Browser UI         |
 |  Next.js (exported app)   |
-|  - Kanban board           |
-|  - AI chat sidebar        |
+|  - Board switcher          |
+|  - Kanban board             |
+|  - AI chat sidebar         |
 +------------+--------------+
              |
              | HTTP (/api/*, /)
              v
 +---------------------------+
 |      FastAPI backend      |
-|  - Board read/write API   |
+|  - Auth (signup/login/     |
+|    logout/sessions)        |
+|  - Board CRUD + ownership  |
 |  - AI orchestration        |
 |  - Static frontend serve  |
 +------------+--------------+
@@ -37,7 +44,8 @@ The app supports a simple MVP sign-in flow (`user` / `password`) and stores one 
 |      SQLite database      |
 |   backend/data/pm.db      |
 |  - users                  |
-|  - boards                 |
+|  - sessions                |
+|  - boards (multi per user) |
 +---------------------------+
              ^
              |
@@ -52,7 +60,8 @@ The app supports a simple MVP sign-in flow (`user` / `password`) and stores one 
 
 - Frontend: Next.js (App Router), TypeScript, Tailwind CSS, DnD Kit
 - Backend: FastAPI, Python 3.12
-- Database: SQLite (`sqlite3` stdlib)
+- Database: SQLite (`sqlite3` stdlib, no ORM)
+- Auth: `bcrypt` password hashing, opaque DB-backed session tokens (cookie-based)
 - AI Provider: OpenRouter (`openai/gpt-oss-120b`)
 - Packaging/runtime: Docker, docker compose
 - Tests:
@@ -106,33 +115,30 @@ Set these in `.env` (project root):
 3. Ensure the selected model is available:
    - `AI_MODEL=openai/gpt-oss-120b` (default already set in backend code)
 
-If key is missing or OpenRouter is unavailable, the app returns friendly AI error messages and preserves board state.
+If key is missing or OpenRouter is unavailable, the app returns friendly AI error messages and preserves board
+state.
 
 ## Features
 
-- Hardcoded MVP sign-in (`user` / `password`)
-- Single Kanban board per user persisted in SQLite
-- Column rename, card add/delete, drag-and-drop move
-- AI sidebar that can perform multiple board operations in one message
-- AI result summaries with per-operation feedback
-- Friendly handling for invalid AI output
-- One-level Undo for the most recent AI-driven board change
-- Chat UX polish:
-  - timestamps
-  - loading indicator
-  - Enter to send, Shift+Enter newline
-  - send disabled while waiting
-  - auto-scroll to latest message
+- Real accounts: signup/login/logout with bcrypt-hashed passwords and server-side sessions (httpOnly cookie)
+- Multiple boards per user: create, rename, archive/unarchive, delete (with confirmation), switch between them
+- Board data is private per account - one user can never read or write another user's boards
+- Column rename, card add/edit/delete, drag-and-drop move
+- Optional card metadata: label, due date, assignee - collapsed by default so quick card creation is unaffected
+- AI sidebar that can move/create/update/delete cards (including setting label/due date/assignee) and rename
+  columns, in one message
+- Friendly handling for invalid AI output and network/auth errors (no raw backend errors surface to the UI)
+- Chat UX polish: loading indicator, Enter to send/Shift+Enter newline, send disabled while waiting
 
-## Screenshots
+## Documentation
 
-Placeholder: add release screenshots here.
+- `AGENTS.md` - business requirements, technical decisions, coding standards
+- `CLAUDE.md` - architecture reference for AI coding assistants working in this repo
+- `docs/PLAN.md` - full phased build history (Parts 1-15) and the future roadmap
+- `docs/DB_SCHEMA.md` - database schema and board JSON contract
 
 ## Future improvements
 
-- Real authentication and sessions
-- Multi-board support per user
-- Richer AI planning controls and operation preview
-- Collaboration and presence
-- Background jobs / retry policies for AI tasks
-- Observability (metrics, tracing, error dashboards)
+See `docs/PLAN.md`'s "Recommended future roadmap (v2)" section for the full list. Highlights: hosted/
+multi-tenant deployment, real-time collaboration/presence, richer AI planning controls (operation preview
+before applying), and observability (metrics, tracing, error dashboards).

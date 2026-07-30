@@ -265,35 +265,35 @@ demo password so existing logins keep working), `backend/auth.py` (hash/verify/s
 frontend login are left untouched in this Part — the app must remain fully runnable exactly as before.
 
 ### Checklist
-- [ ] Add `sessions` table to `backend/db.py` schema (additive, no rebuild needed).
-- [ ] Add `backend/migrations.py`: prints the resolved DB path and writes a timestamped backup
+- [x] Add `sessions` table to `backend/db.py` schema (additive, no rebuild needed).
+- [x] Add `backend/migrations.py`: prints the resolved DB path and writes a timestamped backup
       (`pm.db.<UTC-timestamp>.bak`) only when there is an actual legacy password hash to upgrade; upgrades it
       to a real `bcrypt` hash via `UPDATE ... WHERE password_hash = <sentinel>` (idempotent by construction).
-- [ ] Add `backend/auth.py`: `hash_password`/`verify_password` (bcrypt), `create_session`/`get_session_user`/
+- [x] Add `backend/auth.py`: `hash_password`/`verify_password` (bcrypt), `create_session`/`get_session_user`/
       `delete_session` (opaque `secrets.token_urlsafe(32)` token, 30-day flat expiry, no sliding renewal).
-- [ ] Add `bcrypt` to `backend/requirements.txt`.
-- [ ] Add routes: `POST /api/auth/signup`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`,
+- [x] Add `bcrypt` to `backend/requirements.txt`.
+- [x] Add routes: `POST /api/auth/signup`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`,
       all via httpOnly/SameSite=Lax session cookie; no CSRF token needed (SameSite=Lax already blocks
       cross-site cookie attachment on the mutating verbs used here).
-- [ ] Update `docs/DB_SCHEMA.md` for the new `sessions` table and the real password-hash contract.
+- [x] Update `docs/DB_SCHEMA.md` for the new `sessions` table and the real password-hash contract.
 
 ### Tests
-- [ ] Unit: hash/verify roundtrip, wrong password rejected, two hashes of the same password differ (salt).
-- [ ] Unit: session create/validate/expire (insert an expired row directly, no real sleep), tampered/garbage
+- [x] Unit: hash/verify roundtrip, wrong password rejected, two hashes of the same password differ (salt).
+- [x] Unit: session create/validate/expire (insert an expired row directly, no real sleep), tampered/garbage
       token rejected.
-- [ ] Integration: signup success + duplicate-username 409; login success + wrong-password + unknown-username
+- [x] Integration: signup success + duplicate-username 409; login success + wrong-password + unknown-username
       (identical response shape for the latter two, no enumeration); logout deletes the session row (replay
       same cookie afterward -> 401); `/api/auth/me` reflects session state, 401 with no/invalid cookie.
-- [ ] Migration test: pre-seed the legacy sentinel hash, run migration, assert real hash + login still
+- [x] Migration test: pre-seed the legacy sentinel hash, run migration, assert real hash + login still
       succeeds with the original demo password, backup file created, second run is a no-op (no duplicate
       backup, no re-update).
 
 ### Success criteria
-- [ ] New auth endpoints work end-to-end against the real DB layer.
-- [ ] Old board routes and frontend login behavior are unchanged (verified by existing test suite still
+- [x] New auth endpoints work end-to-end against the real DB layer.
+- [x] Old board routes and frontend login behavior are unchanged (verified by existing test suite still
       passing unmodified).
-- [ ] Migration preserves all existing user/board data; DB path and backup path are printed when it runs.
-- [ ] User approves Part 11 before Part 12 begins.
+- [x] Migration preserves all existing user/board data; DB path and backup path are printed when it runs.
+- [x] User approves Part 11 before Part 12 begins.
 
 ---
 
@@ -305,19 +305,19 @@ to flow through the existing (unchanged) `/api/board/{username}` routes undernea
 how a user authenticates, not how boards are fetched, so the app stays fully functional throughout.
 
 ### Checklist
-- [ ] `app/page.tsx`: real signup + login forms calling `/api/auth/signup` / `/api/auth/login`.
-- [ ] Drop the `sessionStorage` `pm-auth-username` hack; rehydrate auth state via `GET /api/auth/me` on load.
-- [ ] Logout button calls `POST /api/auth/logout`.
-- [ ] Add a small profile display (current username) near the logout control.
+- [x] `app/page.tsx`: real signup + login forms calling `/api/auth/signup` / `/api/auth/login`.
+- [x] Drop the `sessionStorage` `pm-auth-username` hack; rehydrate auth state via `GET /api/auth/me` on load.
+- [x] Logout button calls `POST /api/auth/logout`.
+- [x] Add a small profile display (current username) near the logout control.
 
 ### Tests
-- [ ] Unit: `page.test.tsx` updated for signup/login against mocked `/api/auth/*`.
-- [ ] E2E: signup -> land on board -> reload keeps session -> logout -> login again.
+- [x] Unit: `page.test.tsx` updated for signup/login against mocked `/api/auth/*`.
+- [x] E2E: signup -> land on board -> reload keeps session -> logout -> login again.
 
 ### Success criteria
-- [ ] Real per-user accounts fully replace the hardcoded credential check.
-- [ ] Board interactions (drag/drop, AI chat) keep working unchanged.
-- [ ] User approves Part 12 before Part 13 begins.
+- [x] Real per-user accounts fully replace the hardcoded credential check.
+- [x] Board interactions (drag/drop, AI chat) keep working unchanged.
+- [x] User approves Part 12 before Part 13 begins.
 
 ---
 
@@ -332,33 +332,33 @@ and the frontend `BoardSwitcher` + `boardId`-scoped board loading that consumes 
 `/api/board/{username}*` routes are removed in this same Part, once the frontend no longer calls them.
 
 ### Checklist
-- [ ] `backend/migrations.py`: prints DB path, timestamped backup, rebuilds `boards` (FK pragma off/on around
+- [x] `backend/migrations.py`: prints DB path, timestamped backup, rebuilds `boards` (FK pragma off/on around
       the rebuild, `PRAGMA foreign_key_check`, idempotency check so repeat startups are no-ops).
-- [ ] `db.py`: board CRUD scoped by `user_id` (list/create/get/update/rename/archive/delete), ownership
+- [x] `db.py`: board CRUD scoped by `user_id` (list/create/get/update/rename/archive/delete), ownership
       enforced in the SQL itself (`WHERE id = ? AND user_id = ?`).
-- [ ] Routes: `GET/POST /api/boards`, `GET/PUT/PATCH/DELETE /api/boards/{id}`, `POST /api/boards/{id}/chat`,
+- [x] Routes: `GET/POST /api/boards`, `GET/PUT/PATCH/DELETE /api/boards/{id}`, `POST /api/boards/{id}/chat`,
       all behind the Part 11 session dependency; mismatched/missing board -> 404 (never 403).
-- [ ] Remove `/api/board/{username}*` routes.
-- [ ] Frontend: `BoardSwitcher` (create/rename/archive/unarchive/delete/switch), `KanbanBoard` takes `boardId`,
+- [x] Remove `/api/board/{username}*` routes.
+- [x] Frontend: `BoardSwitcher` (create/rename/archive/unarchive/delete/switch), `KanbanBoard` takes `boardId`,
       `lib/boardApi.ts` updated to the new endpoints. Default board on load: most recently updated
       non-archived board, else create one. Zero-board state handled as first-class UI.
-- [ ] Update `docs/DB_SCHEMA.md` and strike the "one board per user" / hardcoded-login limitations in
+- [x] Update `docs/DB_SCHEMA.md` and strike the "one board per user" / hardcoded-login limitations in
       `AGENTS.md`.
 
 ### Tests
-- [ ] Ownership isolation matrix: user A vs user B's board for every verb (`GET/PUT/PATCH/DELETE
+- [x] Ownership isolation matrix: user A vs user B's board for every verb (`GET/PUT/PATCH/DELETE
       /api/boards/{id}`, `POST /api/boards/{id}/chat`) -> 404; every `/api/boards*` route with no cookie -> 401.
-- [ ] Zero-board state: `GET /api/boards` -> `[]` cleanly, frontend renders a sane empty state.
-- [ ] Migration test: pre-seed the old single-board schema, run migration, assert board/card data preserved
+- [x] Zero-board state: `GET /api/boards` -> `[]` cleanly, frontend renders a sane empty state.
+- [x] Migration test: pre-seed the old single-board schema, run migration, assert board/card data preserved
       with `name = 'My Board'`, idempotent second run.
-- [ ] Frontend: `BoardSwitcher.test.tsx`, updated `KanbanBoard.test.tsx`; e2e covering create/switch/rename/
+- [x] Frontend: `BoardSwitcher.test.tsx`, updated `KanbanBoard.test.tsx`; e2e covering create/switch/rename/
       archive/delete and cross-user isolation.
 
 ### Success criteria
-- [ ] Users can create, rename, archive, and delete boards, and switch between them.
-- [ ] Cross-user board access is impossible (verified by the isolation test matrix).
-- [ ] App is fully runnable immediately after this Part lands (no interim broken state).
-- [ ] User approves Part 13 before Part 14 begins.
+- [x] Users can create, rename, archive, and delete boards, and switch between them.
+- [x] Cross-user board access is impossible (verified by the isolation test matrix).
+- [x] App is fully runnable immediately after this Part lands (no interim broken state).
+- [x] User approves Part 13 before Part 14 begins.
 
 ---
 
@@ -369,30 +369,71 @@ Extend the card model with optional `label`, `dueDate`, and `assignee` fields (l
 requested work).
 
 ### Checklist
-- [ ] Extend `Card` type and `validate_board_data` for the new optional fields.
-- [ ] Update card create/edit UI to capture and display them.
-- [ ] Update AI `prompt_builder`/`operation_executor` so `create_card`/edits can set them.
+- [x] Extend `Card` type and `validate_board_data` for the new optional fields.
+- [x] Update card create/edit UI to capture and display them.
+- [x] Update AI `prompt_builder`/`operation_executor` so `create_card`/edits can set them.
 
 ### Tests
-- [ ] Backend: validation accepts/rejects the new fields correctly; AI operation tests updated.
-- [ ] Frontend: card form/display unit tests for the new fields.
+- [x] Backend: validation accepts/rejects the new fields correctly; AI operation tests updated.
+- [x] Frontend: card form/display unit tests for the new fields.
 
 ### Success criteria
-- [ ] New fields are optional and don't break existing boards/cards.
-- [ ] User approves Part 14 before Part 15 begins.
+- [x] New fields are optional and don't break existing boards/cards.
+- [x] User approves Part 14 before Part 15 begins.
 
 ---
 
 ## Part 15: Docs and cleanup pass
 
 ### Scope
-Final sweep of `docs/PLAN.md` itself and any remaining stale references now that Parts 11-14 are complete.
+Final sweep of all project documentation (`CLAUDE.md`, `AGENTS.md`, `docs/PLAN.md`, `docs/DB_SCHEMA.md`,
+`README.md`, plus `backend/AGENTS.md`/`frontend/AGENTS.md`/`scripts/AGENTS.md`) now that Parts 11-14 are
+complete, and a repo-wide dead code/duplication review.
 
 ### Checklist
-- [ ] Re-read `CLAUDE.md`/`AGENTS.md`/`docs/DB_SCHEMA.md` for anything still describing the old single-board,
-      hardcoded-login model; fix.
-- [ ] Full backend + frontend test/build run.
+- [x] Re-read `CLAUDE.md`/`AGENTS.md`/`docs/DB_SCHEMA.md`/`README.md` for anything still describing the old
+      single-board, hardcoded-login model; fix. Also rewrote `backend/AGENTS.md` and `frontend/AGENTS.md`,
+      which had drifted all the way back to their Part-2/pre-backend-integration state.
+- [x] Removed `docs/README_BACKEND.md` (an unreferenced Part-2 scaffold note describing a hello-world page
+      that hasn't existed since Part 3).
+- [x] Removed `backend/ai/mock_ai.py` and its dedicated `test_mock_ai.py` - a Part 8 mock AI parser fully
+      superseded by the real `operation_executor.py`/`openrouter_ai.py` pipeline in Part 9, never wired into
+      `main.py`, and not re-exported from `backend/ai/__init__.py`.
+- [x] Removed `initialData` from `frontend/src/lib/kanban.ts` - pre-backend-persistence seed data for the
+      original frontend-only demo, unreferenced since boards started loading from the API.
+- [x] Checked off the Part 11-14 checklists in this file (they were previously left unchecked even though
+      each Part was implemented, tested, and approved).
+- [x] Full backend + frontend test/build run.
+
+### Tests
+- [x] No new tests needed (docs/cleanup only); full existing suite re-run to confirm nothing broke from the
+      dead-code removal.
 
 ### Success criteria
-- [ ] No stale documentation describing removed behavior remains.
-- [ ] Full test suite and build pass cleanly.
+- [x] No stale documentation describing removed behavior remains.
+- [x] Full test suite and build pass cleanly.
+- [ ] User approves Part 15.
+
+---
+
+## Recommended future roadmap (v2)
+
+Ideas deliberately deferred as out of scope for this MVP-turned-v1 app, roughly in order of likely value:
+
+- **Hosted / multi-tenant deployment.** Today this is local Docker-only (`secure=False` cookie, no TLS, no
+  horizontal scaling story, SQLite as a single file). A v2 aimed at real users would need TLS, a
+  production-grade database (or at least a plan for SQLite's single-writer limits), and proper secrets
+  management for `OPENROUTER_API_KEY`.
+- **Real-time collaboration/presence.** Multiple people on the same board today only see each other's changes
+  on reload/re-save; no websockets, no live cursors/presence, no conflict resolution beyond last-write-wins.
+- **Richer AI planning controls.** The AI currently applies operations immediately on a successful response;
+  an operation *preview* (show the proposed diff, let the user accept/reject before persisting) would make the
+  AI sidebar safer to use aggressively.
+- **Assignee as a real user reference**, not free text - once there's a notion of teams/collaborators, tie
+  `assignee` to an actual account instead of an arbitrary string.
+- **Observability**: metrics, tracing, and an error dashboard - today failures are only visible via the
+  Python process's stdout/stderr and the browser console.
+- **Session hardening**: login rate-limiting/lockout, sliding session renewal, and a CSRF token if this ever
+  stops being a same-origin, `SameSite=Lax`-only deployment.
+- **Modernize the FastAPI startup hook**: `@app.on_event("startup")` is deprecated in favor of lifespan
+  context managers; harmless today (just a warning), but worth fixing opportunistically.

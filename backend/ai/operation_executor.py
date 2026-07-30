@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import re
 import uuid
 from dataclasses import dataclass
 from typing import Any
@@ -11,7 +12,8 @@ from backend.ai.openrouter_ai import AIServiceError
 from backend.db import validate_board_data
 
 
-SUPPORTED_OPERATION_TYPES = {"move_card", "rename_column", "create_card", "delete_card"}
+SUPPORTED_OPERATION_TYPES = {"move_card", "rename_column", "create_card", "delete_card", "update_card"}
+_DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 @dataclass
@@ -179,12 +181,92 @@ def _validate_and_apply_create_card(board: dict[str, Any], operation: dict[str, 
         raise AIServiceError("Could not find the target column for create_card operation.")
 
     card_id = _create_card_id(board["cards"])
-    board["cards"][card_id] = {
+    card: dict[str, Any] = {
         "id": card_id,
         "title": title,
         "details": details,
     }
+
+    label_value = operation.get("label")
+    if isinstance(label_value, str) and label_value.strip():
+        card["label"] = label_value.strip()
+
+    assignee_value = operation.get("assignee")
+    if isinstance(assignee_value, str) and assignee_value.strip():
+        card["assignee"] = assignee_value.strip()
+
+    due_date_value = operation.get("due_date")
+    if isinstance(due_date_value, str) and due_date_value.strip():
+        if not _DATE_PATTERN.match(due_date_value.strip()):
+            raise AIServiceError('create_card.due_date must be an ISO date string ("YYYY-MM-DD").')
+        card["dueDate"] = due_date_value.strip()
+
+    board["cards"][card_id] = card
     board["columns"][column_index]["cardIds"].append(card_id)
+
+
+def _apply_optional_clearable_field(card: dict[str, Any], operation: dict[str, Any], field_name: str) -> None:
+    """Set, clear, or leave alone one optional string metadata field.
+
+    Absent from ``operation`` -> preserve existing value untouched (this is how
+    editing a card keeps its other metadata intact). Explicit ``null`` -> clear
+    the field. Non-empty string -> set it.
+    """
+    if field_name not in operation:
+        return
+
+    value = operation[field_name]
+    if value is None:
+        card.pop(field_name, None)
+        return
+
+    if not isinstance(value, str) or not value.strip():
+        raise AIServiceError(f"update_card.{field_name} must be a non-empty string or null.")
+    card[field_name] = value.strip()
+
+
+def _apply_due_date_field(card: dict[str, Any], operation: dict[str, Any]) -> None:
+    if "due_date" not in operation:
+        return
+
+    value = operation["due_date"]
+    if value is None:
+        card.pop("dueDate", None)
+        return
+
+    if not isinstance(value, str) or not _DATE_PATTERN.match(value.strip()):
+        raise AIServiceError('update_card.due_date must be an ISO date string ("YYYY-MM-DD") or null.')
+    card["dueDate"] = value.strip()
+
+
+def _validate_and_apply_update_card(board: dict[str, Any], operation: dict[str, Any]) -> None:
+    card_id_value = operation.get("card_id")
+    card_title_value = operation.get("card_title")
+
+    card_id = card_id_value.strip() if isinstance(card_id_value, str) else None
+    card_title = card_title_value.strip() if isinstance(card_title_value, str) else None
+
+    if not card_id and not card_title:
+        raise AIServiceError('update_card requires "card_id" or "card_title".')
+
+    resolved_card_id = _find_card_id_by_id_or_title(board, card_id=card_id, card_title=card_title)
+    if resolved_card_id is None:
+        raise AIServiceError("Could not find the target card for update_card operation.")
+
+    card = board["cards"][resolved_card_id]
+
+    if "title" in operation:
+        card["title"] = _require_non_empty_string(operation["title"], "update_card.title")
+
+    if "details" in operation:
+        details_value = operation["details"]
+        if not isinstance(details_value, str):
+            raise AIServiceError("update_card.details must be a string.")
+        card["details"] = details_value
+
+    _apply_optional_clearable_field(card, operation, "label")
+    _apply_optional_clearable_field(card, operation, "assignee")
+    _apply_due_date_field(card, operation)
 
 
 def _validate_and_apply_delete_card(board: dict[str, Any], operation: dict[str, Any]) -> None:
@@ -233,6 +315,10 @@ def _apply_supported_operation(board: dict[str, Any], operation: dict[str, Any])
 
     if operation_type == "delete_card":
         _validate_and_apply_delete_card(board, operation)
+        return True
+
+    if operation_type == "update_card":
+        _validate_and_apply_update_card(board, operation)
         return True
 
     return False

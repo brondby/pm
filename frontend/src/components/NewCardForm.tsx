@@ -1,6 +1,8 @@
 import { useState, type FormEvent, type SVGProps } from "react";
+import type { CardMetadata } from "@/lib/kanban";
 
 const initialFormState = { title: "", details: "" };
+const initialMetadataState: CardMetadata = { label: "", dueDate: "", assignee: "" };
 
 const PlusIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg
@@ -35,20 +37,28 @@ const XIcon = (props: SVGProps<SVGSVGElement>) => (
 );
 
 type NewCardFormProps = {
-  onAdd: (title: string, details: string) => void;
+  onAdd: (title: string, details: string, metadata: CardMetadata) => void;
 };
 
 export const NewCardForm = ({ onAdd }: NewCardFormProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [formState, setFormState] = useState(initialFormState);
+  const [metadata, setMetadata] = useState<CardMetadata>(initialMetadataState);
+  const [showMoreFields, setShowMoreFields] = useState(false);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!formState.title.trim()) {
       return;
     }
-    onAdd(formState.title.trim(), formState.details.trim());
+    onAdd(formState.title.trim(), formState.details.trim(), {
+      label: metadata.label.trim(),
+      dueDate: metadata.dueDate,
+      assignee: metadata.assignee.trim(),
+    });
     setFormState(initialFormState);
+    setMetadata(initialMetadataState);
+    setShowMoreFields(false);
     setIsOpen(false);
   };
 
@@ -74,6 +84,47 @@ export const NewCardForm = ({ onAdd }: NewCardFormProps) => {
             rows={3}
             className="w-full resize-none rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm text-[var(--gray-text)] outline-none transition focus:border-[var(--primary-blue)]"
           />
+
+          {showMoreFields ? (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <input
+                value={metadata.label}
+                onChange={(event) =>
+                  setMetadata((prev) => ({ ...prev, label: event.target.value }))
+                }
+                placeholder="Label"
+                aria-label="Card label"
+                className="w-full rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)]"
+              />
+              <input
+                type="date"
+                value={metadata.dueDate}
+                onChange={(event) =>
+                  setMetadata((prev) => ({ ...prev, dueDate: event.target.value }))
+                }
+                aria-label="Due date"
+                className="w-full rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)]"
+              />
+              <input
+                value={metadata.assignee}
+                onChange={(event) =>
+                  setMetadata((prev) => ({ ...prev, assignee: event.target.value }))
+                }
+                placeholder="Assignee"
+                aria-label="Assignee"
+                className="w-full rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)]"
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowMoreFields(true)}
+              className="text-xs font-semibold text-[var(--primary-blue)] hover:underline"
+            >
+              + Add label, due date, or assignee
+            </button>
+          )}
+
           <div className="flex items-center gap-2">
             <button
               type="submit"
@@ -87,6 +138,8 @@ export const NewCardForm = ({ onAdd }: NewCardFormProps) => {
               onClick={() => {
                 setIsOpen(false);
                 setFormState(initialFormState);
+                setMetadata(initialMetadataState);
+                setShowMoreFields(false);
               }}
               className="inline-flex items-center gap-1.5 rounded-full border border-[var(--stroke)] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)] transition hover:text-[var(--navy-dark)]"
             >

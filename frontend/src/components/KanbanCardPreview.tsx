@@ -1,3 +1,4 @@
+import { CardBadges } from "@/components/CardBadges";
 import type { Card } from "@/lib/kanban";
 
 type KanbanCardPreviewProps = {
@@ -14,6 +15,7 @@ export const KanbanCardPreview = ({ card }: KanbanCardPreviewProps) => (
         <p className="mt-2 text-sm leading-6 text-[var(--gray-text)]">
           {card.details}
         </p>
+        <CardBadges card={card} />
       </div>
     </div>
   </article>

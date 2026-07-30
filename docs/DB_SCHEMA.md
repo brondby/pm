@@ -1,4 +1,6 @@
-# Part 5: SQLite schema and board JSON contract
+# SQLite schema and board JSON contract
+
+Introduced in Part 5, extended in Parts 11 (auth/sessions), 13 (multi-board), and 14 (card metadata).
 
 ## Database location
 
@@ -108,7 +110,10 @@ Contract is aligned to the current frontend `BoardData` shape:
     "card-1": {
       "id": "card-1",
       "title": "Task title",
-      "details": "Task details"
+      "details": "Task details",
+      "label": "Urgent",
+      "dueDate": "2026-08-15",
+      "assignee": "Alex"
     }
   }
 }
@@ -128,6 +133,12 @@ Validation rules in `validate_board_data()`:
   - `id` non-empty string and must match key
   - `title` non-empty string
   - `details` string
+- Each card may optionally include (Part 14):
+  - `label` - string or `null`/absent
+  - `dueDate` - ISO date string `YYYY-MM-DD`, or `null`/absent
+  - `assignee` - string or `null`/absent
+  - A card that predates Part 14 simply omits these keys, which is valid - no
+    migration was needed since `board_data` is a JSON blob, not fixed columns.
 - Cross-reference rules:
   - every `cardIds` entry must exist in `cards`
   - each card appears in columns exactly once

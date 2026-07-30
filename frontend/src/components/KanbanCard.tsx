@@ -1,20 +1,43 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
-import type { Card } from "@/lib/kanban";
+import { type FormEvent, useState } from "react";
+import { CardBadges } from "@/components/CardBadges";
+import type { Card, CardMetadata } from "@/lib/kanban";
 
 type KanbanCardProps = {
   card: Card;
   onDelete: (cardId: string) => void;
+  onEditMetadata: (cardId: string, metadata: CardMetadata) => void;
 };
 
-export const KanbanCard = ({ card, onDelete }: KanbanCardProps) => {
+const metadataFromCard = (card: Card): CardMetadata => ({
+  label: card.label ?? "",
+  dueDate: card.dueDate ?? "",
+  assignee: card.assignee ?? "",
+});
+
+export const KanbanCard = ({ card, onDelete, onEditMetadata }: KanbanCardProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: card.id });
+
+  const [isEditingMetadata, setIsEditingMetadata] = useState(false);
+  const [metadataDraft, setMetadataDraft] = useState<CardMetadata>(() => metadataFromCard(card));
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
+  };
+
+  const startEditingMetadata = () => {
+    setMetadataDraft(metadataFromCard(card));
+    setIsEditingMetadata(true);
+  };
+
+  const submitMetadata = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    onEditMetadata(card.id, metadataDraft);
+    setIsEditingMetadata(false);
   };
 
   return (
@@ -31,13 +54,74 @@ export const KanbanCard = ({ card, onDelete }: KanbanCardProps) => {
       data-testid={`card-${card.id}`}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h4 className="font-display text-base font-semibold text-[var(--navy-dark)]">
             {card.title}
           </h4>
           <p className="mt-2 text-sm leading-6 text-[var(--gray-text)]">
             {card.details}
           </p>
+          <CardBadges card={card} />
+
+          {isEditingMetadata ? (
+            <form
+              onSubmit={submitMetadata}
+              onPointerDown={(event) => event.stopPropagation()}
+              className="mt-3 space-y-2 border-t border-[var(--stroke)] pt-3"
+            >
+              <input
+                value={metadataDraft.label}
+                onChange={(event) =>
+                  setMetadataDraft((previous) => ({ ...previous, label: event.target.value }))
+                }
+                placeholder="Label"
+                aria-label="Card label"
+                className="w-full rounded-lg border border-[var(--stroke)] px-2 py-1 text-xs text-[var(--navy-dark)] outline-none focus:border-[var(--primary-blue)]"
+              />
+              <input
+                type="date"
+                value={metadataDraft.dueDate}
+                onChange={(event) =>
+                  setMetadataDraft((previous) => ({ ...previous, dueDate: event.target.value }))
+                }
+                aria-label="Due date"
+                className="w-full rounded-lg border border-[var(--stroke)] px-2 py-1 text-xs text-[var(--navy-dark)] outline-none focus:border-[var(--primary-blue)]"
+              />
+              <input
+                value={metadataDraft.assignee}
+                onChange={(event) =>
+                  setMetadataDraft((previous) => ({ ...previous, assignee: event.target.value }))
+                }
+                placeholder="Assignee"
+                aria-label="Assignee"
+                className="w-full rounded-lg border border-[var(--stroke)] px-2 py-1 text-xs text-[var(--navy-dark)] outline-none focus:border-[var(--primary-blue)]"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="submit"
+                  className="rounded-lg bg-[var(--secondary-purple)] px-2 py-1 text-xs font-semibold text-white"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingMetadata(false)}
+                  className="text-xs font-medium text-[var(--gray-text)] hover:underline"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <button
+              type="button"
+              onClick={startEditingMetadata}
+              onPointerDown={(event) => event.stopPropagation()}
+              className="mt-2 text-xs font-semibold text-[var(--primary-blue)] hover:underline"
+            >
+              Edit details
+            </button>
+          )}
         </div>
         <button
           type="button"
